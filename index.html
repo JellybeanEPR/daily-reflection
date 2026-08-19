@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f7f4ee">
+  <link rel="manifest" href="manifest.json">
+  <title>Daily</title>
+  <style>
+    :root {
+      --bg: #f7f4ee;
+      --card: #fffdf9;
+      --text: #292722;
+      --muted: #777269;
+      --line: #ded8cd;
+      --accent: #6f7d68;
+      --accent-light: #e7ebe3;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    main {
+      max-width: 680px;
+      margin: 0 auto;
+      padding: 28px 18px 48px;
+    }
+    header { text-align: center; margin-bottom: 26px; }
+    h1 { font-size: 30px; margin: 0 0 5px; font-weight: 650; }
+    .date { color: var(--muted); font-size: 16px; }
+    .nav {
+      display: flex; align-items: center; justify-content: space-between;
+      margin: 0 auto 26px; max-width: 430px;
+    }
+    button {
+      border: 0; border-radius: 10px; padding: 10px 14px;
+      background: var(--accent-light); color: var(--text);
+      font-size: 15px; cursor: pointer;
+    }
+    button:active { transform: scale(.98); }
+    .today-btn { background: transparent; color: var(--accent); font-weight: 600; }
+    section { margin-top: 28px; }
+    h2 {
+      font-size: 13px; letter-spacing: .09em; text-transform: uppercase;
+      color: var(--muted); margin: 0 0 12px;
+    }
+    .question {
+      background: var(--card); border: 1px solid var(--line);
+      border-radius: 14px; padding: 15px; margin-bottom: 13px;
+    }
+    .question label { display: block; font-size: 16px; line-height: 1.35; margin-bottom: 10px; }
+    textarea {
+      width: 100%; min-height: 78px; resize: vertical;
+      border: 1px solid var(--line); border-radius: 10px;
+      padding: 10px; font: inherit; color: var(--text);
+      background: #fff;
+      outline: none;
+    }
+    textarea:focus, input:focus { border-color: var(--accent); }
+    .tasks {
+      background: var(--card); border: 1px solid var(--line);
+      border-radius: 14px; overflow: hidden;
+    }
+    .task {
+      display: flex; align-items: center; gap: 10px;
+      padding: 12px 14px; border-bottom: 1px solid var(--line);
+    }
+    .task:last-child { border-bottom: 0; }
+    .task input[type="checkbox"] { width: 20px; height: 20px; accent-color: var(--accent); }
+    .task span { flex: 1; font-size: 16px; }
+    .task.done span { text-decoration: line-through; color: var(--muted); }
+    .delete { background: transparent; color: var(--muted); padding: 4px 7px; font-size: 18px; }
+    .add-row { display: flex; gap: 8px; margin-top: 10px; }
+    .add-row input {
+      flex: 1; min-width: 0; border: 1px solid var(--line); border-radius: 10px;
+      padding: 10px; font: inherit; background: white; outline: none;
+    }
+    .save-note { text-align: center; color: var(--muted); font-size: 12px; margin-top: 18px; }
+    .empty { padding: 15px; color: var(--muted); font-size: 15px; }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Daily</h1>
+    <div class="date" id="date"></div>
+  </header>
+
+  <div class="nav">
+    <button id="prev">← Earlier</button>
+    <button class="today-btn" id="today">Today</button>
+    <button id="next">Later →</button>
+  </div>
+
+  <section>
+    <h2>Daily questions</h2>
+
+    <div class="question">
+      <label for="q0">Do you have a plan for tomorrow? (health, fitness, project – or hours? – or location?)</label>
+      <textarea id="q0" data-q="0" placeholder="Write whatever comes to mind…"></textarea>
+    </div>
+
+    <div class="question">
+      <label for="q1">Is there something you are looking forward to?</label>
+      <textarea id="q1" data-q="1" placeholder="Something big or small…"></textarea>
+    </div>
+
+    <div class="question">
+      <label for="q2">Do you know what you are going to eat?</label>
+      <textarea id="q2" data-q="2" placeholder="Breakfast, lunch, dinner, snacks…"></textarea>
+    </div>
+  </section>
+
+  <section>
+    <h2>Must do</h2>
+    <div class="tasks" id="mustTasks"></div>
+    <div class="add-row">
+      <input id="mustInput" placeholder="Add something…" enterkeyhint="done">
+      <button id="addMust">Add</button>
+    </div>
+  </section>
+
+  <section>
+    <h2>Want to do</h2>
+    <div class="tasks" id="wantTasks"></div>
+    <div class="add-row">
+      <input id="wantInput" placeholder="Add something…" enterkeyhint="done">
+      <button id="addWant">Add</button>
+    </div>
+  </section>
+
+  <div class="save-note">Your entries are saved automatically on this device.</div>
+</main>
+
+<script>
+  const QUESTIONS = 3;
+  const state = JSON.parse(localStorage.getItem("dailyApp") || "{}");
+  let currentDate = new Date();
+  currentDate.setHours(12,0,0,0);
+
+  function keyForDate(d) {
+    return d.toISOString().slice(0,10);
+  }
+
+  function getDay(d) {
+    const key = keyForDate(d);
+    if (!state[key]) {
+      state[key] = {
+        answers: Array(QUESTIONS).fill(""),
+        must: [],
+        want: []
+      };
+    }
+    return state[key];
+  }
+
+  function save() {
+    localStorage.setItem("dailyApp", JSON.stringify(state));
+  }
+
+  function formatDate(d) {
+    return d.toLocaleDateString(undefined, {
+      weekday: "long", month: "long", day: "numeric", year: "numeric"
+    });
+  }
+
+  function renderTasks(containerId, tasks, type) {
+    const container = document.getElementById(containerId);
+    container.innerHTML = "";
+    if (!tasks.length) {
+      container.innerHTML = '<div class="empty">Nothing here yet.</div>';
+      return;
+    }
+    tasks.forEach((task, index) => {
+      const row = document.createElement("div");
+      row.className = "task" + (task.done ? " done" : "");
+
+      const checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.checked = task.done;
+      checkbox.addEventListener("change", () => {
+        task.done = checkbox.checked;
+        save();
+        render();
+      });
+
+      const span = document.createElement("span");
+      span.textContent = task.text;
+
+      const del = document.createElement("button");
+      del.className = "delete";
+      del.textContent = "×";
+      del.setAttribute("aria-label", "Delete task");
+      del.addEventListener("click", () => {
+        tasks.splice(index, 1);
+        save();
+        render();
+      });
+
+      row.append(checkbox, span, del);
+      container.appendChild(row);
+    });
+  }
+
+  function render() {
+    const day = getDay(currentDate);
+    document.getElementById("date").textContent = formatDate(currentDate);
+
+    for (let i = 0; i < QUESTIONS; i++) {
+      const box = document.getElementById("q" + i);
+      box.value = day.answers[i] || "";
+    }
+
+    renderTasks("mustTasks", day.must, "must");
+    renderTasks("wantTasks", day.want, "want");
+  }
+
+  document.querySelectorAll("textarea").forEach(box => {
+    box.addEventListener("input", () => {
+      const day = getDay(currentDate);
+      day.answers[Number(box.dataset.q)] = box.value;
+      save();
+    });
+  });
+
+  function addTask(type, inputId) {
+    const input = document.getElementById(inputId);
+    const text = input.value.trim();
+    if (!text) return;
+    const day = getDay(currentDate);
+    day[type].push({ text, done: false });
+    input.value = "";
+    save();
+    render();
+    input.focus();
+  }
+
+  document.getElementById("addMust").addEventListener("click", () => addTask("must", "mustInput"));
+  document.getElementById("addWant").addEventListener("click", () => addTask("want", "wantInput"));
+
+  document.getElementById("mustInput").addEventListener("keydown", e => {
+    if (e.key === "Enter") addTask("must", "mustInput");
+  });
+  document.getElementById("wantInput").addEventListener("keydown", e => {
+    if (e.key === "Enter") addTask("want", "wantInput");
+  });
+
+  document.getElementById("prev").addEventListener("click", () => {
+    currentDate.setDate(currentDate.getDate() - 1);
+    render();
+  });
+  document.getElementById("next").addEventListener("click", () => {
+    currentDate.setDate(currentDate.getDate() + 1);
+    render();
+  });
+  document.getElementById("today").addEventListener("click", () => {
+    currentDate = new Date();
+    currentDate.setHours(12,0,0,0);
+    render();
+  });
+
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
+  }
+
+  render();
+</script>
+</body>
+</html>
